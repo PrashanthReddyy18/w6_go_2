@@ -4,147 +4,192 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"sync"
 )
 
-// Task struct represents a single task
-type Task struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Status      string `json:"status"` // "pending" or "completed"
+// User struct representing the User model
+type User struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"` // Plain text password
 }
 
-var (
-	tasks  = []Task{}
-	nextID = 1
-	mu     sync.Mutex
-)
+// In-memory user store (slice)
+var users []User
+var mu sync.Mutex // Mutex for concurrency safety
+var nextID = 1    // For generating the user ID
 
-// Create a new task (POST /tasks)
-func createTask(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
+// Register a new user (Create)
+func registerUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
 
-	var newTask Task
+	var newUser User
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&newTask); err != nil {
+	if err := decoder.Decode(&newUser); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	newTask.ID = nextID
+	// Add the new user to the slice
+	mu.Lock()
+	newUser.ID = nextID
+	users = append(users, newUser)
 	nextID++
+	mu.Unlock()
 
-	tasks = append(tasks, newTask)
+	// Respond with success
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(newTask)
+	json.NewEncoder(w).Encode(newUser)
 }
 
-// Get all tasks (GET /tasks)
-func getAllTasks(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tasks)
-}
-
-// Get task by ID (GET /tasks/{id})
-func getTaskByID(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	idStr := r.URL.Path[len("/tasks/"):]
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+// Login user (Read)
+func loginUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	for _, task := range tasks {
-		if task.ID == id {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(task)
-			return
-		}
+	var loginDetails struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
 	}
 
-	http.Error(w, "Task not found", http.StatusNotFound)
-}
-
-// Update task (PUT /tasks/{id})
-func updateTask(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	idStr := r.URL.Path[len("/tasks/"):]
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
-	}
-
-	var updatedTask Task
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&updatedTask); err != nil {
+	if err := decoder.Decode(&loginDetails); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	for i, task := range tasks {
-		if task.ID == id {
-			// Update task fields
-			tasks[i].Title = updatedTask.Title
-			tasks[i].Description = updatedTask.Description
-			tasks[i].Status = updatedTask.Status
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(tasks[i])
-			return
+	// Find the user in the slice
+	mu.Lock()
+	var foundUser *User
+	for i := range users {
+		if users[i].Username == loginDetails.Username {
+			foundUser = &users[i]
+			break
 		}
 	}
+	mu.Unlock()
 
-	http.Error(w, "Task not found", http.StatusNotFound)
-}
-
-// Delete task (DELETE /tasks/{id})
-func deleteTask(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	idStr := r.URL.Path[len("/tasks/"):]
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+	// If user is not found
+	if foundUser == nil {
+		http.Error(w, "User not found", http.StatusUnauthorized)
 		return
 	}
 
-	for i, task := range tasks {
-		if task.ID == id {
-			tasks = append(tasks[:i], tasks[i+1:]...)
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+	// Compare the stored password with the provided one
+	if foundUser.Password != loginDetails.Password {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
 	}
 
-	http.Error(w, "Task not found", http.StatusNotFound)
+	// Successful login
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(foundUser)
+}
+
+// Update user information (Update)
+func updateUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var updatedUser User
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&updatedUser); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find and update the user in the slice
+	mu.Lock()
+	var foundUser *User
+	for i := range users {
+		if users[i].ID == updatedUser.ID {
+			foundUser = &users[i]
+			break
+		}
+	}
+	mu.Unlock()
+
+	// If user is not found
+	if foundUser == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Update the user information
+	mu.Lock()
+	if updatedUser.Email != "" {
+		foundUser.Email = updatedUser.Email
+	}
+	if updatedUser.Password != "" {
+		foundUser.Password = updatedUser.Password // Store the updated password
+	}
+	mu.Unlock()
+
+	// Respond with updated user information
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(foundUser)
+}
+
+// Delete user by ID (Delete)
+func deleteUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var idToDelete struct {
+		ID int `json:"id"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&idToDelete); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Find and delete the user from the slice
+	mu.Lock()
+	var deleted bool
+	for i := range users {
+		if users[i].ID == idToDelete.ID {
+			// Remove user from the slice
+			users = append(users[:i], users[i+1:]...)
+			deleted = true
+			break
+		}
+	}
+	mu.Unlock()
+
+	// Respond with success or failure
+	if deleted {
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		http.Error(w, "User not found", http.StatusNotFound)
+	}
+}
+
+// Setup routes
+func setupRoutes() {
+	http.HandleFunc("/register", registerUser)
+	http.HandleFunc("/login", loginUser)
+	http.HandleFunc("/update", updateUser)
+	http.HandleFunc("/delete", deleteUser)
 }
 
 func main() {
-	http.HandleFunc("/tasks", createTask)        // Create new task
-	http.HandleFunc("/tasks", getAllTasks)       // Get all tasks
-	http.HandleFunc("/tasks/", getTaskByID)      // Get task by ID
-	http.HandleFunc("/tasks/", updateTask)       // Update task by ID
-	http.HandleFunc("/tasks/", deleteTask)       // Delete task by ID
+	// Set up routes
+	setupRoutes()
 
-	fmt.Println("Server started at :8080")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
+	// Start the server
+	fmt.Println("Starting server on :8080...")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
 }
