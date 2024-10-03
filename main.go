@@ -7,15 +7,15 @@ import (
 	"sync"
 )
 
-// User struct representing the User model
+// User struct description of  the User model
 type User struct {
 	ID       int    `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
-	Password string `json:"password"` // Plain text password
+	Password string `json:"password"` // Plain  password in text
 }
 
-// In-memory user store (slice)
+// In-memory  store (slice)
 var users []User
 var mu sync.Mutex // Mutex for concurrency safety
 var nextID = 1    // For generating the user ID
@@ -123,17 +123,17 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update the user information
+	// Update the user info
 	mu.Lock()
 	if updatedUser.Email != "" {
 		foundUser.Email = updatedUser.Email
 	}
 	if updatedUser.Password != "" {
-		foundUser.Password = updatedUser.Password // Store the updated password
+		foundUser.Password = updatedUser.Password // Store the updated passwd
 	}
 	mu.Unlock()
 
-	// Respond with updated user information
+	// Respond with updated user info
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(foundUser)
 }
@@ -167,11 +167,11 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	mu.Unlock()
 
-	// Respond with success or failure
+	// Respond with success msg or failure msg
 	if deleted {
 		w.WriteHeader(http.StatusNoContent)
 	} else {
-		http.Error(w, "User not found", http.StatusNotFound)
+		http.Error(w, "User is not found", http.StatusNotFound)
 	}
 }
 
@@ -188,7 +188,7 @@ func main() {
 	setupRoutes()
 
 	// Start the server
-	fmt.Println("Starting server on :8080...")
+	fmt.Println("Starting the server on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
