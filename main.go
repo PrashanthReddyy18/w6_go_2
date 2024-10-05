@@ -11,7 +11,7 @@ import (
 type User struct {
 	ID       int    `json:"id"` //User Id which is identical for each user
 	Username string `json:"username"`
-	Email    string `json:"email"`    //
+	Email    string `json:"email"`
 	Password string `json:"password"` // Plain  password in text
 }
 
