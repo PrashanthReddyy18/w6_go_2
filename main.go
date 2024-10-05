@@ -1,23 +1,23 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"sync"
+	"encoding/json" //This package is for encoding and decoding the JSON data
+	"fmt"           //This package is used for formatting input/output function like printf/scanf
+	"net/http"      //This provides HTTP client and server implementations
+	"sync"          //This package has basic synchronization primitives to handle concurrent prgramming
 )
 
-// User struct description of  the User model
+// Below is the User struct description of  the User model
 type User struct {
-	ID       int    `json:"id"`
+	ID       int    `json:"id"` //User Id which is identical for each user
 	Username string `json:"username"`
-	Email    string `json:"email"`
+	Email    string `json:"email"`    //
 	Password string `json:"password"` // Plain  password in text
 }
 
 // In-memory  store (slice)
 var users []User
-var mu sync.Mutex // Mutex for concurrency safety
+var mu sync.Mutex //  mutual exclusion lock to allow only one goroutine can access a critical section at a time.
 var nextID = 1    // For generating the user ID
 
 // Register a new user (Create)
@@ -35,13 +35,13 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add the new user to the slice
-	mu.Lock()
+	mu.Lock() // used to lock a mutex (mutual exclusion lock)and allows single goroutine can access a shared resource at a time.
 	newUser.ID = nextID
 	users = append(users, newUser)
 	nextID++
 	mu.Unlock()
 
-	// Respond with success
+	// Respond with success after registering the user
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(newUser)
 }
@@ -87,7 +87,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Successful login
+	// Successful login msg
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(foundUser)
 }
@@ -175,7 +175,7 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Setup routes
+// Setup routes for each operation
 func setupRoutes() {
 	http.HandleFunc("/register", registerUser)
 	http.HandleFunc("/login", loginUser)

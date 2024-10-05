@@ -1,0 +1,8 @@
+marup@MPR MINGW64 ~/Documents/Code/go/src/github.com/PrashanthReddyy18/w6_go_2 (master)
+$ curl -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "prashanth Reddy", "email": "prashanthreddy@gmail.com", "password": "123456"}'
+{"id":1,"username":"prashanth Reddy","email":"prashanthreddy@gmail.com","password":"123456"}
+
+marup@MPR MINGW64 ~/Documents/Code/go/src/github.com/PrashanthReddyy18/w6_go_2 (master)
+$ 
